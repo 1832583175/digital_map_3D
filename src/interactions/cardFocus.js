@@ -1,8 +1,10 @@
 /**
  * 左右卡片「悬浮聚焦」交互
- * 位移/缩放/旋转交给 GSAP；光效（四角/霓虹/扫描）在 cards.css。
+ * 全局唯一焦点：指针在哪个卡片范围内，就只有它亮起，其余全部压暗。
  */
 const PARENT_TILT = 6;
+const DIM = 0.34;
+const HIT_MARGIN = 6;
 
 function injectFx(card) {
     if (card.querySelector(':scope > .card-fx')) return;
@@ -22,48 +24,48 @@ function injectFx(card) {
 export function setupCardFocus(gsap) {
     if (!gsap) return () => {};
     const cards = gsap.utils.toArray('.left-card, .right-card');
-    const cleanups = [];
+    if (!cards.length) return () => {};
 
     cards.forEach((card) => {
         if (card.dataset.fxBound === '1') return;
         card.dataset.fxBound = '1';
         injectFx(card);
+    });
 
-        const isLeft = !!card.closest('.left-wrap');
-        const frontAngle = isLeft ? -PARENT_TILT : PARENT_TILT;
-        const inward = isLeft ? 30 : -30;
-        const popZ = isLeft ? 72 : 115;
-        const siblings = [...(card.parentElement?.children || [])].filter(
-            (el) => el !== card && (el.classList.contains('left-card') || el.classList.contains('right-card'))
-        );
+    let focused = null;
+    let frame = 0;
 
-        let active = false;
-        let restRect = null;
-        let leaveTimer = null;
+    // 命中判定：当前聚焦的卡片用它「变形前」的矩形，其余用实时矩形
+    const hitTest = (x, y) => {
+        for (const card of cards) {
+            const r =
+                card === focused && card.__restRect ? card.__restRect : card.getBoundingClientRect();
+            const m = card === focused ? HIT_MARGIN : 0;
+            if (x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m) return card;
+        }
+        return null;
+    };
 
-        // 指针是否还在「卡片未变形前的原始范围」内（留 2px 容差）
-        const insideRest = (e) => {
-            if (!restRect) return false;
-            const M = 2;
-            return (
-                e.clientX >= restRect.left - M &&
-                e.clientX <= restRect.right + M &&
-                e.clientY >= restRect.top - M &&
-                e.clientY <= restRect.bottom + M
-            );
-        };
+    const focusCard = (card) => {
+        if (card === focused) return;
+        const prev = focused;
+        focused = card;
 
-        const onDocMove = (e) => {
-            if (active && !insideRest(e)) doLeave();
-        };
+        // 除了目标卡片，其余一律压暗；目标为空则全部恢复
+        cards.forEach((c) => {
+            if (c === card) return;
+            gsap.to(c, {
+                opacity: card ? DIM : 1,
+                duration: 0.4,
+                ease: 'power2.out',
+                overwrite: 'auto',
+            });
+        });
 
-        const doLeave = () => {
-            if (!active) return;
-            active = false;
-            restRect = null;
-            document.removeEventListener('pointermove', onDocMove);
-            card.classList.remove('is-focus');
-            gsap.to(card, {
+        if (prev) {
+            prev.classList.remove('is-focus');
+            prev.__restRect = null;
+            gsap.to(prev, {
                 x: 0,
                 z: 0,
                 scale: 1,
@@ -71,63 +73,62 @@ export function setupCardFocus(gsap) {
                 duration: 0.52,
                 ease: 'power2.out',
                 overwrite: 'auto',
-                onComplete: () => gsap.set(card, { zIndex: 4 }),
+                onComplete: () => gsap.set(prev, { zIndex: 4 }),
             });
-            if (siblings.length) {
-                gsap.to(siblings, { opacity: 1, duration: 0.45, ease: 'power2.out', overwrite: 'auto' });
-            }
-        };
+        }
 
-        const enter = () => {
-            clearTimeout(leaveTimer);
-            if (active) return;
-            active = true;
-            // 关键：在变形之前记下原始范围
-            restRect = card.getBoundingClientRect();
-            document.addEventListener('pointermove', onDocMove, { passive: true });
-
+        if (card) {
+            const isLeft = !!card.closest('.left-wrap');
+            card.__restRect = card.getBoundingClientRect();
             gsap.killTweensOf(card);
             card.classList.add('is-focus');
             gsap.set(card, { zIndex: 30 });
             gsap.to(card, {
-                x: inward,
-                z: popZ,
+                x: isLeft ? 30 : -30,
+                z: isLeft ? 72 : 115,
                 scale: 1.02,
-                rotationY: frontAngle,
+                rotationY: isLeft ? -PARENT_TILT : PARENT_TILT,
                 duration: 0.62,
                 ease: 'power3.out',
                 overwrite: 'auto',
             });
-            if (siblings.length) {
-                gsap.to(siblings, { opacity: 0.34, duration: 0.45, ease: 'power2.out', overwrite: 'auto' });
-            }
-        };
+        }
+    };
 
-        // mouseleave 仅作为兜底（指针瞬间飞出、没产生 pointermove 的情况）
-        const onLeave = () => {
-            clearTimeout(leaveTimer);
-            leaveTimer = setTimeout(() => {
-                if (!restRect) return;
-                doLeave();
-            }, 120);
-        };
-
-        card.addEventListener('mouseenter', enter);
-        card.addEventListener('mouseleave', onLeave);
-        card.addEventListener('touchstart', enter, { passive: true });
-        card.addEventListener('touchend', doLeave, { passive: true });
-
-        cleanups.push(() => {
-            clearTimeout(leaveTimer);
-            document.removeEventListener('pointermove', onDocMove);
-            card.removeEventListener('mouseenter', enter);
-            card.removeEventListener('mouseleave', onLeave);
-            card.removeEventListener('touchstart', enter);
-            card.removeEventListener('touchend', doLeave);
-            card.classList.remove('is-focus');
-            delete card.dataset.fxBound;
+    const onPointerMove = (e) => {
+        const x = e.clientX;
+        const y = e.clientY;
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+            frame = 0;
+            focusCard(hitTest(x, y));
         });
-    });
+    };
 
-    return () => cleanups.forEach((fn) => fn());
+    const onPointerDown = (e) => {
+        if (e.pointerType === 'touch') focusCard(hitTest(e.clientX, e.clientY));
+    };
+
+    const onResize = () => {
+        cards.forEach((c) => {
+            c.__restRect = null;
+        });
+        if (focused) focused.__restRect = focused.getBoundingClientRect();
+    };
+
+    document.addEventListener('pointermove', onPointerMove, { passive: true });
+    document.addEventListener('pointerdown', onPointerDown, { passive: true });
+    window.addEventListener('resize', onResize);
+
+    return () => {
+        cancelAnimationFrame(frame);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerdown', onPointerDown);
+        window.removeEventListener('resize', onResize);
+        cards.forEach((c) => {
+            c.classList.remove('is-focus');
+            c.__restRect = null;
+            delete c.dataset.fxBound;
+        });
+    };
 }
