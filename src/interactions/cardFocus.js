@@ -81,6 +81,8 @@ export function setupCardFocus(gsap) {
             const isLeft = !!card.closest('.left-wrap');
             card.__restRect = card.getBoundingClientRect();
             gsap.killTweensOf(card);
+            // 关键：新卡片可能还停留在「被上一张压暗」的状态，先恢复亮度
+            gsap.to(card, { opacity: 1, duration: 0.3, overwrite: 'auto' });
             card.classList.add('is-focus');
             gsap.set(card, { zIndex: 30 });
             gsap.to(card, {
