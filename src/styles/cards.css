@@ -243,3 +243,13 @@
         text-shadow: 0px 0px 18px rgba(255, 255, 255, 0.7);
     }
 }
+/* 悬浮聚焦时，卡片本体提亮，突出当前卡片 */
+.left-card,
+.right-card {
+    transition: filter 0.3s ease;
+}
+
+.left-card.is-focus,
+.right-card.is-focus {
+    filter: brightness(1.4) saturate(1.15);
+}
