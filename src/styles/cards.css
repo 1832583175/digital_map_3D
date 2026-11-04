@@ -251,5 +251,11 @@
 
 .left-card.is-focus,
 .right-card.is-focus {
-    filter: brightness(1.4) saturate(1.15);
+    filter: brightness(1.8) saturate(1.2);
 }
+
+/* 叠一层淡青色薄纱：暗底色也会明显变亮 */
+.is-focus > .card-fx {
+    background: rgba(48, 220, 255, 0.08);
+}
+
