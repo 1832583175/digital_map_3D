@@ -1,0 +1,245 @@
+/* ============================================================
+ * 左右卡片悬浮聚焦 · 科技感视觉层
+ * ------------------------------------------------------------
+ * 位移/缩放/旋转由 GSAP 控制（见 src/interactions/cardFocus.js），
+ * 这里只负责「光」：四角光标、边缘霓虹、扫描带、顶部高光条。
+ * 全部为 transform/opacity 动画，不触发重排，纯 GPU 合成。
+ * ============================================================ */
+
+.left-card,
+.right-card {
+    /* 让卡片成为 3D 变换的独立单元：z-index 提升时才不会被兄弟卡片压住 */
+    transform-style: preserve-3d;
+    will-change: transform, opacity;
+}
+
+/* 父容器默认是扁平化的（会丢弃子元素的 translateZ 透视投影），
+   打开 preserve-3d 后卡片才能真正沿 Z 轴向镜头探出 */
+.large-screen-wrap .left-wrap-3d,
+.large-screen-wrap .right-wrap-3d {
+    transform-style: preserve-3d;
+}
+
+/* 装饰层容器：不拦截任何鼠标事件，图表交互照常 */
+.card-fx {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.32s ease;
+    --fx: #30dcff;
+    --fx-soft: rgba(48, 220, 255, 0.55);
+}
+
+.is-focus > .card-fx {
+    opacity: 1;
+}
+
+/* ---- 边缘霓虹：一层描边 + 内外发光 ---- */
+.card-fx .fx-edge {
+    position: absolute;
+    inset: -1px;
+    border: 1px solid var(--fx-soft);
+    border-radius: 2px;
+    box-shadow:
+        0 0 12px rgba(48, 220, 255, 0.35),
+        0 0 34px rgba(48, 220, 255, 0.18),
+        inset 0 0 22px rgba(48, 220, 255, 0.1);
+    background:
+        linear-gradient(180deg, rgba(48, 220, 255, 0.12), rgba(48, 220, 255, 0) 42%),
+        linear-gradient(90deg, rgba(48, 220, 255, 0.1), rgba(48, 220, 255, 0) 22%);
+    opacity: 0;
+    transform: scale(0.985);
+    transition: opacity 0.3s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.is-focus > .card-fx > .fx-edge {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* ---- 四角光标：L 形角标，带外发光 ---- */
+.card-fx .fx-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--fx);
+    border-radius: 1px;
+    filter: drop-shadow(0 0 4px rgba(48, 220, 255, 0.9));
+    opacity: 0;
+    transition: opacity 0.26s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.card-fx .fx-corner.is-tl {
+    left: -3px;
+    top: -3px;
+    border-right: 0;
+    border-bottom: 0;
+    transform: translate(-6px, -6px);
+}
+
+.card-fx .fx-corner.is-tr {
+    right: -3px;
+    top: -3px;
+    border-left: 0;
+    border-bottom: 0;
+    transform: translate(6px, -6px);
+}
+
+.card-fx .fx-corner.is-bl {
+    left: -3px;
+    bottom: -3px;
+    border-right: 0;
+    border-top: 0;
+    transform: translate(-6px, 6px);
+}
+
+.card-fx .fx-corner.is-br {
+    right: -3px;
+    bottom: -3px;
+    border-left: 0;
+    border-top: 0;
+    transform: translate(6px, 6px);
+}
+
+.is-focus > .card-fx > .fx-corner {
+    opacity: 1;
+    transform: translate(0, 0);
+}
+
+/* ---- 扫描带：自上而下扫过整张卡片 ---- */
+.card-fx .fx-scan {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 46%;
+    background: linear-gradient(
+        180deg,
+        rgba(48, 220, 255, 0) 0%,
+        rgba(48, 220, 255, 0.1) 55%,
+        rgba(170, 255, 255, 0.42) 96%,
+        rgba(48, 220, 255, 0.7) 100%
+    );
+    mix-blend-mode: screen;
+    opacity: 0;
+    transform: translateY(-100%);
+    will-change: transform, opacity;
+}
+
+.is-focus > .card-fx > .fx-scan {
+    animation: cardFxScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) 0.12s infinite;
+}
+
+@keyframes cardFxScan {
+    0% {
+        transform: translateY(-105%);
+        opacity: 0;
+    }
+    14% {
+        opacity: 0.85;
+    }
+    82% {
+        opacity: 0.85;
+    }
+    100% {
+        transform: translateY(215%);
+        opacity: 0;
+    }
+}
+
+/* ---- 顶部高光条：从中间向两侧展开（HUD 味） ---- */
+.card-fx::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -1px;
+    width: 0;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, rgba(48, 220, 255, 0), #a8f4ff, rgba(48, 220, 255, 0));
+    box-shadow: 0 0 10px rgba(48, 220, 255, 0.9);
+    transform: translateX(-50%);
+    transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.is-focus > .card-fx::before {
+    width: 62%;
+}
+
+/* 底部同款弱一点的收边，避免头重脚轻 */
+.card-fx::after {
+    content: '';
+    position: absolute;
+    left: 22%;
+    right: 22%;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(48, 220, 255, 0), rgba(48, 220, 255, 0.75), rgba(48, 220, 255, 0));
+    opacity: 0;
+    transition: opacity 0.35s ease 0.1s;
+}
+
+.is-focus > .card-fx::after {
+    opacity: 1;
+}
+
+/* 低端设备 / 用户偏好减少动画：只保留位移与描边，去掉循环扫描 */
+@media (prefers-reduced-motion: reduce) {
+    .is-focus > .card-fx > .fx-scan {
+        animation: none;
+        opacity: 0.25;
+        transform: translateY(0);
+    }
+    .card-fx *,
+    .card-fx::before,
+    .card-fx::after {
+        transition-duration: 0.12s !important;
+    }
+}
+
+/* 数据同步遮罩（后端推送后短暂提示） */
+.dashboard-sync-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 10, 24, 0.55);
+    backdrop-filter: blur(2px);
+    color: #a8f4ff;
+    font-size: 14px;
+    letter-spacing: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.dashboard-sync-mask.is-visible {
+    opacity: 1;
+}
+
+/* KPI 实时推送时的数字高亮脉冲 */
+.count-card {
+    transition: filter 0.35s ease;
+}
+
+.count-card.is-flash .count-card-right .value {
+    animation: kpiFlash 1.3s ease-out 1;
+}
+
+@keyframes kpiFlash {
+    0% {
+        text-shadow: 0 0 2px rgba(48, 220, 255, 0.4);
+    }
+    25% {
+        text-shadow:
+            0 0 18px rgba(48, 220, 255, 1),
+            0 0 42px rgba(48, 220, 255, 0.7);
+    }
+    100% {
+        text-shadow: 0px 0px 18px rgba(255, 255, 255, 0.7);
+    }
+}
