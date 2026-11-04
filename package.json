@@ -1,0 +1,18 @@
+{
+  "name": "xinjiang-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "新疆数据可视化大屏（Three.js + ECharts）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 8081",
+    "start": "vite build && vite preview --port 8080",
+    "api": "node server/index.js",
+    "api:seed": "node server/scripts/build-seed.js"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}
