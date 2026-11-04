@@ -1,0 +1,13 @@
+{
+  "name": "xinjiang-dashboard-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "新疆数据可视化大屏 · 独立数据后端（零依赖，node index.js 直接运行）",
+  "scripts": {
+    "start": "node index.js",
+    "seed": "node scripts/build-seed.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
