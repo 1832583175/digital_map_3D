@@ -19,4 +19,8 @@ bootstrap().finally(() => {
     connectLive()
     // 暴露调试口：控制台里可以 window.__DASHBOARD__.cfg 直接看当前生效数据
     window.__DASHBOARD__ = { cfg }
+    // 顶部「地图特效」开关工具条（光柱/飞线/粒子等），点击地图地州可凸起
+    import('./interactions/mapFxToolbar.js')
+        .then((m) => m.setupMapFxToolbar())
+        .catch((err) => console.warn('[mapFx] 工具条加载失败：', err))
 })

@@ -26705,7 +26705,7 @@ class $K extends dZ {
         super(t), this.geoProjectionCenter = cfg.map.projectionCenter, this.geoProjectionScale = cfg.map.projectionScale, this.flyLineCenter = cfg.map.flyLineCenter, this.depth = .5, this.mapFocusLabelInfo = cfg.map.focusLabel, this.clicked = !1, this.scene.fog = new $w(1058614, 1, 50), this.scene.background = new Vt(1058614), this.camera.instance.position.set(-13.767695123014105, 12.990152163077308, 39.28228164159694), this.camera.instance.near = 1, this.camera.instance.far = 1e4, this.camera.instance.updateProjectionMatrix(), this.interactionManager = new qK(this.renderer.instance, this.camera.instance, this.canvas), this.assets = e, this.initEnvironment(), this.init()
     }
     init() {
-        this.labelGroup = new pn, this.label3d = new xZ(this), this.labelGroup.rotation.x = -Math.PI / 2, this.scene.add(this.labelGroup), this.flyLineFocusGroup = new pn, this.flyLineFocusGroup.visible = !1, this.flyLineFocusGroup.rotation.x = -Math.PI / 2, this.scene.add(this.flyLineFocusGroup), this.eventElement = [], this.defaultMaterial = null, this.defaultLightMaterial = null, this.createBottomBg(), this.createChinaBlurLine(), this.createGrid(), this.createRotateBorder(), this.createLabel(), this.createMap(), this.createEvent(), this.createFlyLine(), this.createFocus(), this.createParticles(), this.createScatter(), this.createInfoPoint(), this.createStorke();
+        this.labelGroup = new pn, this.label3d = new xZ(this), this.labelGroup.rotation.x = -Math.PI / 2, this.scene.add(this.labelGroup), this.flyLineFocusGroup = new pn, this.flyLineFocusGroup.visible = !1, this.flyLineFocusGroup.rotation.x = -Math.PI / 2, this.scene.add(this.flyLineFocusGroup), this.eventElement = [], this.defaultMaterial = null, this.defaultLightMaterial = null, this.createBottomBg(), this.createChinaBlurLine(), this.createGrid(), this.createRotateBorder(), this.createLabel(), this.createMap(), this.createEvent(), this.createFlyLine(), this.createFocus(), this.createParticles(), this.createScatter(), this.createInfoPoint(), this.createStorke(), this.createRegionLabels();
         let t = Fn.timeline({
             onComplete: () => {}
         });
@@ -26730,7 +26730,9 @@ class $K extends dZ {
             z: 1,
             ease: "circ.out",
             onComplete: () => {
-                this.flyLineGroup.visible = !0, this.scatterGroup.visible = !0, this.InfoPointGroup.visible = !0, this.createInfoPointLabelLoop()
+                // 新增：入场结束后按「特效开关工具条」的偏好决定显示哪些特效
+                const p = k => !(window.__MAP_FX_PREFS__ && window.__MAP_FX_PREFS__[k] === !1)
+                this.flyLineGroup.visible = p("flyLine"), this.scatterGroup.visible = p("scatter"), this.InfoPointGroup.visible = p("infoPoint"), p("infoPoint") && this.createInfoPointLabelLoop()
             }
         }, "focusMap"), t.to(this.focusMapTopMaterial, {
             duration: 1,
@@ -26771,7 +26773,8 @@ class $K extends dZ {
             z: 1,
             ease: "circ.out",
             onComplete: () => {
-                this.flyLineFocusGroup.visible = !0, h0.$emit("mapPlayComplete")
+                // 新增：飞线聚焦组同样受偏好控制
+                this.flyLineFocusGroup.visible = !(window.__MAP_FX_PREFS__ && window.__MAP_FX_PREFS__.flyLine === !1), h0.$emit("mapPlayComplete")
             }
         }, "focusMapOpacity"), this.allBar.map((e, n) => {
             if (e.userData.name === "喀什地区") return !1;
@@ -26830,6 +26833,8 @@ class $K extends dZ {
                 ease: "circ.out"
             }, "bar")
         })
+        // 对外暴露场景引用：顶部「地图特效」开关工具条（src/interactions/mapFxToolbar.js）从这里拿分组
+        window.__MAP_SCENE__ = this
     }
     initEnvironment() {
         let t = new fk(16777215, 5);
@@ -26916,8 +26921,10 @@ class $K extends dZ {
                 topFaceMaterial: e,
                 sideMaterial: n,
                 renderOrder: 9
-            }),
-            a = new sp({
+            });
+        // 记住立体地图分组：点击凸起时需要同时抬起对应地州的立体块
+        this.solidMapGroup = i.mapGroup;
+        let a = new sp({
                 color: 16777215,
                 transparent: !0,
                 opacity: .5
@@ -27102,6 +27109,22 @@ class $K extends dZ {
     </div>`, c), t.label3d.setLabelStyle(h, .01, "x"), h.setParent(t.labelGroup), h
         }
     }
+    /**
+     * 新增：14 个地州名称标注（兵团市不标，避免小区域文字互相遮挡）。
+     * 只新增标签层，不改动地图本体与立体结构。
+     */
+    createRegionLabels() {
+        const t = ["石河子市", "阿拉尔市", "图木舒克市", "五家渠市", "北屯市", "铁门关市", "双河市", "可克达拉市", "昆玉市", "胡杨河市"]
+        this.regionLabelGroup = new pn, this.focusMapGroup.add(this.regionLabelGroup)
+        eD.map(e => {
+            if (t.includes(e.name)) return !1
+            const n = e.centroid || e.center
+            if (!n || !n.length) return !1
+            const [i, a] = this.geoProjection(n)
+            let o = this.label3d.create("", "region-name-label", !1)
+            o.init(`<div class="region-name-label"><span>${e.name}</span></div>`, new V(i, -a, this.depth + .32)), this.label3d.setLabelStyle(o, .012, "x"), o.setParent(this.regionLabelGroup)
+        })
+    }
     createEvent() {
         let t = [];
         const e = i => {
@@ -27114,13 +27137,54 @@ class $K extends dZ {
                     a.isMesh && (a.material = this.defaultLightMaterial)
                 })
             };
+        // 新增：悬浮凸起。悬浮哪个地州，整个立体块（顶层覆盖面 + 立体挤出块）一起升起，移开回落。
+        // 不改动地图本体几何与材质，只新增行为。
+        this.hoverLift = { current: null, timer: null, records: new Map };
+        const findRegion = i => {
+            const a = this.eventElement.find(o => o.parent && o.parent.userData.name === i)
+            return a ? a.parent : null
+        };
+        const solidOf = i =>
+            this.solidMapGroup ? this.solidMapGroup.children.find(a => a.userData.name === i) || null : null;
+        const raise = i => {
+            const a = findRegion(i)
+            if (!a) return
+            const o = solidOf(i)
+            const s = this.hoverLift.records.get(i) || { top: a, topZ: a.position.z, solid: o, solidZ: o ? o.position.z : 0 }
+            this.hoverLift.records.set(i, s),
+                Fn.killTweensOf(a.position), o && Fn.killTweensOf(o.position),
+                Fn.to(a.position, { z: s.topZ + .5, duration: .55, ease: "power3.out" }),
+                o && Fn.to(o.position, { z: s.solidZ + .5, duration: .55, ease: "power3.out" }),
+                n(a)
+        };
+        const lower = i => {
+            const a = this.hoverLift.records.get(i)
+            if (!a) return
+            Fn.killTweensOf(a.top.position), a.solid && Fn.killTweensOf(a.solid.position),
+                Fn.to(a.top.position, { z: a.topZ, duration: .45, ease: "power2.out" }),
+                a.solid && Fn.to(a.solid.position, { z: a.solidZ, duration: .45, ease: "power2.out" }),
+                e(a.top), this.hoverLift.records.delete(i)
+        };
         this.eventElement.map(i => {
             this.interactionManager.add(i), i.addEventListener("mousedown", a => {
                 console.log(a.target.userData.name)
             }), i.addEventListener("mouseover", a => {
-                t.includes(a.target.parent) || t.push(a.target.parent), document.body.style.cursor = "pointer", n(a.target.parent)
+                document.body.style.cursor = "pointer";
+                const o = a.target.parent && a.target.parent.userData.name;
+                if (!o || o === this.hoverLift.current) return;
+                // 同一地州内部 mesh 之间切换会瞬间 out→over，这里以「当前地州」为准，切换才动作
+                clearTimeout(this.hoverLift.timer),
+                    this.hoverLift.current && lower(this.hoverLift.current),
+                    this.hoverLift.current = o, raise(o)
             }), i.addEventListener("mouseout", a => {
-                t = t.filter(o => o.userData.name !== a.target.parent.userData.name), t.length > 0 && t[t.length - 1], e(a.target.parent), document.body.style.cursor = "default"
+                document.body.style.cursor = "default";
+                const o = a.target.parent && a.target.parent.userData.name;
+                if (!o || o !== this.hoverLift.current) return;
+                // 延迟落块：等一小会儿确认没有移到同地州的另一块面上
+                clearTimeout(this.hoverLift.timer),
+                    this.hoverLift.timer = setTimeout(() => {
+                        this.hoverLift.current === o && (this.hoverLift.current = null, lower(o))
+                    }, 70)
             })
         })
     }
@@ -27494,7 +27558,7 @@ class $K extends dZ {
             renderOrder: 22,
             tubeRadius: .03
         });
-        this.focusMapGroup.add(n.lineGroup), this.time.on("tick", () => {
+        this.storkeLineGroup = n.lineGroup, this.focusMapGroup.add(n.lineGroup), this.time.on("tick", () => {
             e.offset.x += .005
         })
     }
