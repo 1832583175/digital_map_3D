@@ -27191,10 +27191,15 @@ class $K extends dZ {
             return (o.userData && o.userData.name) || (o.parent && o.parent.userData.name) || null;
         };
         this.canvas.addEventListener("pointermove", a => {
+            // 关键修复：rAF 回调必须使用「最新一次」的鼠标坐标。
+            // 之前回调里用的是排队那一次事件的旧坐标，鼠标快速滑过/滑出画布时，
+            // 会拿过期坐标把错误的地州升起来，且之后没有事件再来纠正，
+            // 就出现「没悬浮也凹凸不平」的卡死块。
+            this.hoverLift.lastX = a.clientX, this.hoverLift.lastY = a.clientY;
             if (this.hoverLift.frame) return;
             this.hoverLift.frame = requestAnimationFrame(() => {
                 this.hoverLift.frame = 0;
-                const o = pickRegion(a.clientX, a.clientY);
+                const o = pickRegion(this.hoverLift.lastX, this.hoverLift.lastY);
                 document.body.style.cursor = o ? "pointer" : "default";
                 if (o === this.hoverLift.current) return;
                 this.hoverLift.current && lower(this.hoverLift.current);
@@ -27203,10 +27208,10 @@ class $K extends dZ {
             })
         }, { passive: !0 });
         this.canvas.addEventListener("pointerleave", () => {
-            // 关键：取消还没执行的拾取帧，否则它会拿着过期坐标把地州升起来，
-            // 之后再也没有事件来纠正，就出现「没悬浮也凸起」的卡死块
+            // 关键：取消还没执行的拾取帧，并把所有已升起的块全部落回去（双保险）
             this.hoverLift.frame && (cancelAnimationFrame(this.hoverLift.frame), this.hoverLift.frame = 0);
-            this.hoverLift.current && (lower(this.hoverLift.current), this.hoverLift.current = null)
+            this.hoverLift.records.forEach((v, k) => lower(k));
+            this.hoverLift.current = null
         });
         this.eventElement.map(i => {
             this.interactionManager.add(i), i.addEventListener("mousedown", a => {
@@ -27339,24 +27344,12 @@ class $K extends dZ {
             let f = l(h, n, e);
             i.push(f)
         });
+        // 新增修复：去掉左右两侧的「菱形+叉」装饰图标（decoration-label），
+        // 用户明确不要这种瞄准叉样式，只保留顶部地图名称标签。
         let a = u({
-                ...this.mapFocusLabelInfo
-            }, n, e),
-            o = c({
-                icon: xx,
-                center: [96.946334, 44.5],
-                width: "40px",
-                height: "40px",
-                reflect: !0
-            }, n, e),
-            s = c({
-                icon: xx,
-                center: [72.946334, 39.5],
-                width: "20px",
-                height: "20px",
-                reflect: !1
-            }, n, e);
-        i.push(a), i.push(o), i.push(s), this.otherLabel = i;
+            ...this.mapFocusLabelInfo
+        }, n, e);
+        i.push(a), this.otherLabel = i;
 
         function l(h, f, d) {
             let p = f.create("", `china-label ${h.blur?" blur":""}`, !1);
