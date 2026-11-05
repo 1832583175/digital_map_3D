@@ -26705,7 +26705,7 @@ class $K extends dZ {
         super(t), this.geoProjectionCenter = cfg.map.projectionCenter, this.geoProjectionScale = cfg.map.projectionScale, this.flyLineCenter = cfg.map.flyLineCenter, this.depth = .5, this.mapFocusLabelInfo = cfg.map.focusLabel, this.clicked = !1, this.scene.fog = new $w(1058614, 1, 50), this.scene.background = new Vt(1058614), this.camera.instance.position.set(-13.767695123014105, 12.990152163077308, 39.28228164159694), this.camera.instance.near = 1, this.camera.instance.far = 1e4, this.camera.instance.updateProjectionMatrix(), this.interactionManager = new qK(this.renderer.instance, this.camera.instance, this.canvas), this.assets = e, this.initEnvironment(), this.init()
     }
     init() {
-        this.labelGroup = new pn, this.label3d = new xZ(this), this.labelGroup.rotation.x = -Math.PI / 2, this.scene.add(this.labelGroup), this.flyLineFocusGroup = new pn, this.flyLineFocusGroup.visible = !1, this.flyLineFocusGroup.rotation.x = -Math.PI / 2, this.scene.add(this.flyLineFocusGroup), this.eventElement = [], this.defaultMaterial = null, this.defaultLightMaterial = null, this.createBottomBg(), this.createChinaBlurLine(), this.createGrid(), this.createRotateBorder(), this.createLabel(), this.createMap(), this.createEvent(), this.createFlyLine(), this.createFocus(), this.createParticles(), this.createScatter(), this.createInfoPoint(), this.createStorke(), this.createRegionLabels();
+        this.labelGroup = new pn, this.label3d = new xZ(this), this.labelGroup.rotation.x = -Math.PI / 2, this.scene.add(this.labelGroup), this.flyLineFocusGroup = new pn, this.flyLineFocusGroup.visible = !1, this.flyLineFocusGroup.rotation.x = -Math.PI / 2, this.scene.add(this.flyLineFocusGroup), this.eventElement = [], this.defaultMaterial = null, this.defaultLightMaterial = null, this.createBottomBg(), this.createChinaBlurLine(), this.createGrid(), this.createRotateBorder(), this.createLabel(), this.createMap(), this.createEvent(), this.createFlyLine(), this.createParticles(), this.createScatter(), this.createInfoPoint(), this.createStorke(), this.createRegionLabels();
         let t = Fn.timeline({
             onComplete: () => {}
         });
@@ -26922,8 +26922,17 @@ class $K extends dZ {
                 sideMaterial: n,
                 renderOrder: 9
             });
-        // 记住立体地图分组：点击凸起时需要同时抬起对应地州的立体块
+        // 记住立体地图分组：悬浮凸起时需要同时抬起对应地州的立体块
         this.solidMapGroup = i.mapGroup;
+        // 关键修复：AZ.create 里每个地州的立体 Group 没有写入 userData.name，
+        // coordinates 与 mapGroup.children 是同一次遍历按同顺序生成的，一一对应，这里补上名字，
+        // 这样凸起逻辑才能按名称找到「整个立体挤出块」并让它一起升起（而不是只抬顶面盖板）。
+        i.coordinates.forEach((c, idx) => {
+            const g = i.mapGroup.children[idx];
+            g && (g.userData.name = c.name, g.traverse(m => {
+                m.isMesh && !m.userData.name && (m.userData.name = c.name)
+            }));
+        });
         let a = new sp({
                 color: 16777215,
                 transparent: !0,
@@ -27139,7 +27148,7 @@ class $K extends dZ {
             };
         // 新增：悬浮凸起。悬浮哪个地州，整个立体块（顶层覆盖面 + 立体挤出块）一起升起，移开回落。
         // 不改动地图本体几何与材质，只新增行为。
-        this.hoverLift = { current: null, timer: null, records: new Map };
+        this.hoverLift = { current: null, records: new Map, frame: 0 };
         const findRegion = i => {
             const a = this.eventElement.find(o => o.parent && o.parent.userData.name === i)
             return a ? a.parent : null
@@ -27165,26 +27174,43 @@ class $K extends dZ {
                 a.solid && Fn.to(a.solid.position, { z: a.solidZ, duration: .45, ease: "power2.out" }),
                 e(a.top), this.hoverLift.records.delete(i)
         };
+        // 关键修复：不再依赖交互库的 mouseover/mouseout（它会把 mouseover 同时派发给
+        // 「升起的块」和「被它盖住的邻区盖板」，导致相邻地州连锁升降）。
+        // 改为在 pointermove 里手动做射线拾取，只认「最近的那个交点」所属的地州。
+        const raycaster = new Bq;
+        const pickRegion = (x, y) => {
+            const r = this.canvas.getBoundingClientRect();
+            if (!r.width || !r.height) return null;
+            raycaster.setFromCamera({
+                x: ((x - r.left) / r.width) * 2 - 1,
+                y: -((y - r.top) / r.height) * 2 + 1
+            }, this.camera.instance);
+            const hits = raycaster.intersectObjects(this.eventElement, !1);
+            if (!hits.length) return null;
+            const o = hits[0].object;
+            return (o.userData && o.userData.name) || (o.parent && o.parent.userData.name) || null;
+        };
+        this.canvas.addEventListener("pointermove", a => {
+            if (this.hoverLift.frame) return;
+            this.hoverLift.frame = requestAnimationFrame(() => {
+                this.hoverLift.frame = 0;
+                const o = pickRegion(a.clientX, a.clientY);
+                document.body.style.cursor = o ? "pointer" : "default";
+                if (o === this.hoverLift.current) return;
+                this.hoverLift.current && lower(this.hoverLift.current);
+                this.hoverLift.current = o;
+                o && raise(o);
+            })
+        }, { passive: !0 });
+        this.canvas.addEventListener("pointerleave", () => {
+            // 关键：取消还没执行的拾取帧，否则它会拿着过期坐标把地州升起来，
+            // 之后再也没有事件来纠正，就出现「没悬浮也凸起」的卡死块
+            this.hoverLift.frame && (cancelAnimationFrame(this.hoverLift.frame), this.hoverLift.frame = 0);
+            this.hoverLift.current && (lower(this.hoverLift.current), this.hoverLift.current = null)
+        });
         this.eventElement.map(i => {
             this.interactionManager.add(i), i.addEventListener("mousedown", a => {
                 console.log(a.target.userData.name)
-            }), i.addEventListener("mouseover", a => {
-                document.body.style.cursor = "pointer";
-                const o = a.target.parent && a.target.parent.userData.name;
-                if (!o || o === this.hoverLift.current) return;
-                // 同一地州内部 mesh 之间切换会瞬间 out→over，这里以「当前地州」为准，切换才动作
-                clearTimeout(this.hoverLift.timer),
-                    this.hoverLift.current && lower(this.hoverLift.current),
-                    this.hoverLift.current = o, raise(o)
-            }), i.addEventListener("mouseout", a => {
-                document.body.style.cursor = "default";
-                const o = a.target.parent && a.target.parent.userData.name;
-                if (!o || o !== this.hoverLift.current) return;
-                // 延迟落块：等一小会儿确认没有移到同地州的另一块面上
-                clearTimeout(this.hoverLift.timer),
-                    this.hoverLift.timer = setTimeout(() => {
-                        this.hoverLift.current === o && (this.hoverLift.current = null, lower(o))
-                    }, 70)
             })
         })
     }
