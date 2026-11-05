@@ -1947,8 +1947,24 @@ const Bbt = {
                     h0.$emit("loadMap", t.value), setTimeout(async () => {
                         await a(), e.value.play()
                     }, 1e3)
-                })
+                }), Jt()
             }), mB(() => {});
+            // 新增：右上角时间原先是写死的「2023-10-12 17:53:16」静态文字，
+            // 现在改为每秒同步本机真实时间（日期 + 星期 + 时:分:秒）。
+            function Jt() {
+                const u = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"],
+                    l = (c) => String(c).padStart(2, "0");
+                const tick = () => {
+                    const c = document.querySelector(".m-header-date");
+                    if (!c) return;
+                    const d = c.querySelectorAll("span");
+                    if (d.length < 2) return;
+                    const h = new Date;
+                    d[0].textContent = `${h.getFullYear()}-${l(h.getMonth()+1)}-${l(h.getDate())} ${u[h.getDay()]}`,
+                    d[1].textContent = `${l(h.getHours())}:${l(h.getMinutes())}:${l(h.getSeconds())}`
+                };
+                tick(), setInterval(tick, 1e3)
+            }
 
             function i(l) {
                 t.value = new Obt;

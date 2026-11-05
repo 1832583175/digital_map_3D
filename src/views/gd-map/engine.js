@@ -28346,12 +28346,11 @@ const yQ = {
             }
         },
         setup(r) {
-            function t(e) {
-                return e.toUpperCase()
-            }
+            // 用户要求：删掉指标卡下方的大写英文小标注（如 RESIDENT POPULATION IN 2024），
+            // 只保留中文标题，布局更干净。
             return (e, n) => (We(), Ke("div", yQ, [vt("div", _Q, [vt("div", {
                 class: Iw(["count-card-icon", "icon-" + r.info.icon])
-            }, null, 2), vt("div", xQ, [vt("div", AQ, Qr(r.info.zh), 1), vt("div", SQ, Qr(t(r.info.en)), 1)])]), vt("div", bQ, [vt("div", wQ, [ye(Ta(PT), {
+            }, null, 2), vt("div", xQ, [vt("div", AQ, Qr(r.info.zh), 1)])]), vt("div", bQ, [vt("div", wQ, [ye(Ta(PT), {
                 startVal: 0,
                 endVal: r.info.value,
                 decimals: r.info.decimals,
