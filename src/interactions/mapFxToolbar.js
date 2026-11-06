@@ -44,14 +44,17 @@ function injectStyles() {
 @keyframes fxBtnIn{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes fxScan{0%{left:-30%}100%{left:130%}}
 @keyframes fxDotPulse{0%,100%{opacity:1}50%{opacity:.35}}
-#map-fx-toolbar{position:fixed;bottom:112px;left:50%;transform:translateX(-50%);z-index:9998;
+#map-fx-toolbar{position:fixed;bottom:98px;left:50%;transform:translateX(-50%);z-index:9998;
 padding:1px;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 100%,0 100%);
-background:linear-gradient(90deg,rgba(56,189,255,.05),rgba(120,220,255,.75) 18%,rgba(120,220,255,.75) 82%,rgba(56,189,255,.05));
+background:linear-gradient(90deg,rgba(56,189,255,.08),rgba(140,225,255,.85) 18%,rgba(140,225,255,.85) 82%,rgba(56,189,255,.08));
 animation:fxBrittle .5s cubic-bezier(.22,.9,.34,1) .15s backwards;user-select:none}
 #map-fx-toolbar .fx-bar{position:relative;overflow:hidden;display:flex;align-items:stretch;height:38px;
 clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 100%,0 100%);
-background:linear-gradient(180deg,rgba(9,26,50,.94),rgba(3,10,22,.92));
-backdrop-filter:blur(6px)}
+background:linear-gradient(180deg,rgba(30,88,146,.66),rgba(13,52,94,.6) 55%,rgba(9,38,72,.66));
+backdrop-filter:blur(8px) saturate(1.3);
+box-shadow:inset 0 1px 0 rgba(150,225,255,.28),inset 0 -1px 0 rgba(0,20,45,.35),0 4px 18px rgba(0,40,90,.35)}
+#map-fx-toolbar .fx-bar::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;pointer-events:none;
+background:linear-gradient(90deg,transparent 6%,rgba(160,230,255,.75) 50%,transparent 94%)}
 #map-fx-toolbar .fx-bar::after{content:'';position:absolute;top:0;bottom:0;width:22%;pointer-events:none;
 background:linear-gradient(100deg,transparent,rgba(140,225,255,.14),transparent);
 animation:fxScan 5.5s linear infinite}
@@ -76,8 +79,8 @@ background:linear-gradient(180deg,rgba(64,180,255,.16),rgba(64,180,255,.03))}
 #map-fx-toolbar .fx-btn:hover::after{transform:scaleX(1)}
 #map-fx-toolbar .fx-btn:hover svg{filter:drop-shadow(0 0 4px rgba(120,220,255,.9))}
 #map-fx-toolbar .fx-btn:active{transform:scale(.96)}
-#map-fx-toolbar .fx-btn.is-off{color:#54697f;text-shadow:none;background:none}
-#map-fx-toolbar .fx-btn.is-off .dot{background:#3d4f63;box-shadow:none}
+#map-fx-toolbar .fx-btn.is-off{color:#7c97b5;text-shadow:none;background:none}
+#map-fx-toolbar .fx-btn.is-off .dot{background:#5a7290;box-shadow:none}
 #map-fx-toolbar .fx-btn.is-off svg{opacity:.55;filter:none}
 #map-fx-toolbar .fx-btn.fx-reset{color:#ffc46b}
 #map-fx-toolbar .fx-btn.fx-reset .dot{background:#ffb84d;box-shadow:0 0 7px rgba(255,184,77,.8)}
