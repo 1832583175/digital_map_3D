@@ -27148,7 +27148,7 @@ class $K extends dZ {
             };
         // 新增：悬浮凸起。悬浮哪个地州，整个立体块（顶层覆盖面 + 立体挤出块）一起升起，移开回落。
         // 不改动地图本体几何与材质，只新增行为。
-        this.hoverLift = { current: null, records: new Map, frame: 0 };
+        this.hoverLift = { current: null, records: new Map, rest: new Map, frame: 0 };
         const findRegion = i => {
             const a = this.eventElement.find(o => o.parent && o.parent.userData.name === i)
             return a ? a.parent : null
@@ -27159,19 +27159,24 @@ class $K extends dZ {
             const a = findRegion(i)
             if (!a) return
             const o = solidOf(i)
-            const s = this.hoverLift.records.get(i) || { top: a, topZ: a.position.z, solid: o, solidZ: o ? o.position.z : 0 }
-            this.hoverLift.records.set(i, s),
+            // 关键修复：每个地州的「原位基准高度」只在它处于原位时记录一次，永不覆盖。
+            // 此前每次 raise 都重新读当前 z 当原位——若在「落下动画进行中」再次悬浮/点击，
+            // 会把半空的 z（如 0.3）记成原位，之后落下就停在 0.3 回不到 0，地图凹凸不平。
+            this.hoverLift.rest.has(i) || this.hoverLift.rest.set(i, { topZ: a.position.z, solidZ: o ? o.position.z : 0 })
+            const r = this.hoverLift.rest.get(i)
+            this.hoverLift.records.set(i, { top: a, solid: o }),
                 Fn.killTweensOf(a.position), o && Fn.killTweensOf(o.position),
-                Fn.to(a.position, { z: s.topZ + .5, duration: .55, ease: "power3.out" }),
-                o && Fn.to(o.position, { z: s.solidZ + .5, duration: .55, ease: "power3.out" }),
+                Fn.to(a.position, { z: r.topZ + .5, duration: .55, ease: "power3.out" }),
+                o && Fn.to(o.position, { z: r.solidZ + .5, duration: .55, ease: "power3.out" }),
                 n(a)
         };
         const lower = i => {
             const a = this.hoverLift.records.get(i)
             if (!a) return
+            const r = this.hoverLift.rest.get(i) || { topZ: 0, solidZ: 0 }
             Fn.killTweensOf(a.top.position), a.solid && Fn.killTweensOf(a.solid.position),
-                Fn.to(a.top.position, { z: a.topZ, duration: .45, ease: "power2.out" }),
-                a.solid && Fn.to(a.solid.position, { z: a.solidZ, duration: .45, ease: "power2.out" }),
+                Fn.to(a.top.position, { z: r.topZ, duration: .45, ease: "power2.out" }),
+                a.solid && Fn.to(a.solid.position, { z: r.solidZ, duration: .45, ease: "power2.out" }),
                 e(a.top), this.hoverLift.records.delete(i)
         };
         // 关键修复：不再依赖交互库的 mouseover/mouseout（它会把 mouseover 同时派发给
@@ -27213,6 +27218,12 @@ class $K extends dZ {
             this.hoverLift.records.forEach((v, k) => lower(k));
             this.hoverLift.current = null
         });
+        // 双保险 2：按住地块拖到画布外再松手时，pointerleave 可能被拖拽捕获拦截，
+        // 这里在全局松手时兜底：只要松手位置不在地图画布上，就把所有块落回去
+        window.addEventListener("pointerup", a => {
+            this.hoverLift && this.hoverLift.records.size && a.target !== this.canvas &&
+                (this.hoverLift.records.forEach((v, k) => lower(k)), this.hoverLift.current = null)
+        }, { passive: !0 });
         this.eventElement.map(i => {
             this.interactionManager.add(i), i.addEventListener("mousedown", a => {
                 console.log(a.target.userData.name)

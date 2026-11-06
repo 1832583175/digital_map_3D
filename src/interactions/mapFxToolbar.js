@@ -40,16 +40,16 @@ function injectStyles() {
     const style = document.createElement('style')
     style.id = 'map-fx-style'
     style.textContent = `
-@keyframes fxBrittle{0%{opacity:0;transform:translate(-50%,-16px)}100%{opacity:1;transform:translate(-50%,0)}}
+@keyframes fxBrittle{0%{opacity:0;transform:translate(-50%,16px)}100%{opacity:1;transform:translate(-50%,0)}}
 @keyframes fxBtnIn{0%{opacity:0;transform:translateY(-8px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes fxScan{0%{left:-30%}100%{left:130%}}
 @keyframes fxDotPulse{0%,100%{opacity:1}50%{opacity:.35}}
-#map-fx-toolbar{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:9998;
-padding:1px;clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,14px 100%);
+#map-fx-toolbar{position:fixed;bottom:112px;left:50%;transform:translateX(-50%);z-index:9998;
+padding:1px;clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 100%,0 100%);
 background:linear-gradient(90deg,rgba(56,189,255,.05),rgba(120,220,255,.75) 18%,rgba(120,220,255,.75) 82%,rgba(56,189,255,.05));
 animation:fxBrittle .5s cubic-bezier(.22,.9,.34,1) .15s backwards;user-select:none}
 #map-fx-toolbar .fx-bar{position:relative;overflow:hidden;display:flex;align-items:stretch;height:38px;
-clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,14px 100%);
+clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 100%,0 100%);
 background:linear-gradient(180deg,rgba(9,26,50,.94),rgba(3,10,22,.92));
 backdrop-filter:blur(6px)}
 #map-fx-toolbar .fx-bar::after{content:'';position:absolute;top:0;bottom:0;width:22%;pointer-events:none;
@@ -119,24 +119,34 @@ function buildToolbar(categories) {
             window.__MAP_FX_PREFS__[cat.key] = on
             applyCat(cat, on)
             btn.classList.toggle('is-off', !on)
+            syncMaster()
         })
         bar.appendChild(btn)
     })
 
-    const reset = document.createElement('button')
-    reset.className = 'fx-btn fx-reset'
-    reset.style.animationDelay = `${0.25 + nth * 0.06}s`
-    reset.innerHTML = `<i class="dot"></i>${ICONS.reset}<span>全部显示</span>`
-    reset.addEventListener('click', () => {
+    // 一键总开关：全部开着时点它=一键关闭；有关闭项时点它=一键打开
+    const master = document.createElement('button')
+    master.className = 'fx-btn fx-reset'
+    master.style.animationDelay = `${0.25 + nth * 0.06}s`
+    const syncMaster = () => {
+        const allOn = categories.every((cat) => window.__MAP_FX_PREFS__[cat.key] !== false)
+        master.innerHTML = `<i class="dot"></i>${ICONS.reset}<span>${allOn ? '一键关闭' : '一键打开'}</span>`
+        return allOn
+    }
+    syncMaster()
+    master.addEventListener('click', () => {
+        // 目标状态：当前全开 → 关；否则 → 开
+        const target = syncMaster() ? false : true
         categories.forEach((cat) => {
-            window.__MAP_FX_PREFS__[cat.key] = true
-            applyCat(cat, true)
+            window.__MAP_FX_PREFS__[cat.key] = target
+            applyCat(cat, target)
         })
         bar.querySelectorAll('.fx-btn').forEach((b) => {
-            if (!b.classList.contains('fx-reset')) b.classList.remove('is-off')
+            if (!b.classList.contains('fx-reset')) b.classList.toggle('is-off', !target)
         })
+        syncMaster()
     })
-    bar.appendChild(reset)
+    bar.appendChild(master)
 
     document.body.appendChild(wrap)
 }
@@ -159,6 +169,11 @@ export function setupMapFxToolbar() {
             }
             return
         }
+        // 等地图入场动画播完（progress 达到 1）再创建工具条，
+        // 让工具条在地图完全出来之后才动画展示，避免和入场抢注意力
+        const tl = scene.animateTl
+        const ready = tl && typeof tl.progress === 'function' ? tl.progress() >= 1 : tries >= POLL_MAX
+        if (!ready) return
         clearInterval(timer)
         const categories = collectCategories(scene)
         console.log('[mapFx] 特效开关：', categories.map((c) => c.label).join('、') || '（未识别到特效分组）')
