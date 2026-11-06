@@ -1904,7 +1904,7 @@ const Bbt = {
     qbt = {
         class: "bottom-tray"
     },
-    $bt = $p('<div class="bottom-tray-arrow"><img src="' + tC + '" alt=""><img src="' + eC + '" alt=""></div><div class="bottom-menu"><div class="bottom-menu-item is-active"><span>人口概览</span></div><div class="bottom-menu-item"><span>小标题</span></div><div class="bottom-menu-item"><span>小标题</span></div><div class="bottom-menu-item"><span>小标题</span></div></div><div class="bottom-tray-arrow is-reverse"><img src="' + tC + '" alt=""><img src="' + eC + '" alt=""></div>', 3),
+    $bt = $p('<div class="bottom-tray-arrow"><img src="' + tC + '" alt=""><img src="' + eC + '" alt=""></div><div class="bottom-menu"><div class="bottom-menu-item is-active"><span>人口概览</span></div><div class="bottom-menu-item"><span>2024年</span></div><div class="bottom-menu-item"><span>2025年</span></div><div class="bottom-menu-item"><span>2026年</span></div></div><div class="bottom-tray-arrow is-reverse"><img src="' + tC + '" alt=""><img src="' + eC + '" alt=""></div>', 3),
     Zbt = {
         class: "bottom-radar"
     },
