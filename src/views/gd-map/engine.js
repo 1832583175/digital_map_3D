@@ -27103,6 +27103,13 @@ class $K extends dZ {
             let _ = s(l, u, new V(g, -v, this.depth + 1.1 + c));
             this.allBar.push(p), this.allBarMaterial.push(h), this.allGuangquan.push(m), this.allProvinceLabel.push(_)
         }), this.scene.add(n);
+        // 新增：为其余地州补充人口标签（只立标签、不立柱子），高度用统一基准，
+        // 编号延续柱状图排名，并纳入 allProvinceLabel 统一受「人口标签」开关控制。
+        const top7 = new Set(e.map(l => l.name));
+        eD.filter(l => !top7.has(l.name)).sort((l, u) => u.value - l.value).map((l, u) => {
+            const [g, v] = this.geoProjection(l.centroid || l.center);
+            this.allProvinceLabel.push(s(l, 7 + u, new V(g, -v, this.depth + 1.1)))
+        });
 
         function s(l, u, c) {
             let h = t.label3d.create("", "provinces-label", !1);
