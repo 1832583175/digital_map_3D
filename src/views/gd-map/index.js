@@ -6,6 +6,7 @@
  *  数值 / 文案 全部来自 src/config/，本文件只负责布局与图表配置。
  */
 import cfg from '../../config/index.js';
+import { getPopulationByYear } from '../../config/populationByYear.js';
 import '../../styles/page.css';
 import '../../styles/cards.css';
 import { setupCardFocus } from '../../interactions/cardFocus.js';
@@ -1947,7 +1948,22 @@ const Bbt = {
                     h0.$emit("loadMap", t.value), setTimeout(async () => {
                         await a(), e.value.play()
                     }, 1e3)
-                }), Jt()
+                }), Jt(), function () {
+                    // 新增：底部年份切换 —— 点击后地图仅接收新数据并刷新
+                    //（柱体高度 / 标签数值 / 排名序号平滑过渡），不重建场景。
+                    const menu = document.querySelector(".bottom-menu");
+                    if (!menu) return;
+                    const YEAR_OF = [2024, 2024, 2025, 2026]; // 「人口概览」与 2024 年共用基础数据
+                    const items = menu.querySelectorAll(".bottom-menu-item");
+                    items.forEach((item, idx) => {
+                        item.addEventListener("click", () => {
+                            items.forEach((x) => x.classList.remove("is-active")),
+                            item.classList.add("is-active");
+                            const eng = e.value;
+                            eng && eng.updatePopulationData && eng.updatePopulationData(getPopulationByYear(YEAR_OF[idx]))
+                        })
+                    })
+                }()
             }), mB(() => {});
             // 新增：右上角时间原先是写死的「2023-10-12 17:53:16」静态文字，
             // 现在改为每秒同步本机真实时间（日期 + 星期 + 时:分:秒）。

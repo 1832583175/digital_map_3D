@@ -27095,13 +27095,17 @@ class $K extends dZ {
             let p = d,
                 [g, v] = this.geoProjection(l.centroid);
             p.position.set(g, -v, this.depth + .45), p.scale.set(1, 1, 0), p.userData = {
-                ...l
+                ...l,
+                // 记录柱体几何高度（原位基准）与是否隐藏柱体（模板对最高的喀什柱
+                // 只显示光柱不显示实体柱，切年份数据时必须沿用该意图）
+                _barH: c,
+                _hideBar: l.name === "喀什地区"
             };
             let m = this.createQuan(new V(g, this.depth + .44, v), u),
                 y = this.createHUIGUANG(c, u > 3 ? 16776948 : 7863285);
             p.add(...y), n.add(p), n.rotation.x = -Math.PI / 2;
             let _ = s(l, u, new V(g, -v, this.depth + 1.1 + c));
-            this.allBar.push(p), this.allBarMaterial.push(h), this.allGuangquan.push(m), this.allProvinceLabel.push(_)
+            p.userData._label = _, this.allBar.push(p), this.allBarMaterial.push(h), this.allGuangquan.push(m), this.allProvinceLabel.push(_)
         }), this.scene.add(n);
         // 新增：为其余地州补充人口标签（只立标签、不立柱子），高度用统一基准，
         // 编号延续柱状图排名，并纳入 allProvinceLabel 统一受「人口标签」开关控制。
@@ -27124,6 +27128,65 @@ class $K extends dZ {
       </div>
     </div>`, c), t.label3d.setLabelStyle(h, .01, "x"), h.setParent(t.labelGroup), h
         }
+    }
+    /**
+     * 新增：年份切换 —— 仅刷新人口数据，不重建地图。
+     * 柱体高度、标签数值、排名序号、标签悬浮高度全部平滑过渡到新数据。
+     * @param {Array} list 与 cities.js 同结构的数据 [{name, value, ...}]
+     */
+    updatePopulationData(list) {
+        if (!this.allBar || !this.allProvinceLabel || !list || !list.length) return;
+        const t = this,
+            a = 4 * .7; // 与 createBar 保持一致的柱高系数（i = .7）
+        const valMap = new Map(list.map((l) => [l.name, l.value]));
+        const maxV = Math.max(...list.map((l) => l.value));
+        const rank = new Map([...list].sort((l, u) => u.value - l.value).map((l, i) => [l.name, i + 1]));
+        // 1) 柱体高度 + 对应标签悬浮高度（隐藏柱体只动标签）
+        this.allBar.map((bar) => {
+            const name = bar.userData.name,
+                nv = valMap.get(name),
+                barH = bar.userData._barH;
+            if (nv == null || !barH) return;
+            const newC = a * (nv / maxV),
+                label = bar.userData._label;
+            Fn.killTweensOf(bar.scale), label && Fn.killTweensOf(label.position);
+            if (!bar.userData._hideBar) Fn.to(bar.scale, {
+                z: newC / barH,
+                duration: .8,
+                ease: "power2.inOut"
+            });
+            label && Fn.to(label.position, {
+                z: this.depth + 1.1 + newC,
+                duration: .8,
+                ease: "power2.inOut"
+            });
+        });
+        // 2) 标签文字：数值滚动过渡 + 排名序号
+        this.allProvinceLabel.map((label) => {
+            const el = label.element,
+                zh = el.querySelector(".name .zh");
+            if (!zh) return;
+            const name = zh.textContent.trim(),
+                nv = valMap.get(name);
+            if (nv == null) return;
+            const v = el.querySelector(".number .value");
+            if (v) {
+                const from = Number(v.innerText) || 0,
+                    proxy = {
+                        score: from
+                    };
+                Fn.killTweensOf(proxy), Fn.to(proxy, {
+                    score: nv,
+                    duration: .8,
+                    ease: "power2.inOut",
+                    onUpdate: () => {
+                        v.innerText = proxy.score.toFixed(0)
+                    }
+                })
+            }
+            const no = el.querySelector(".no");
+            no && rank.has(name) && (no.textContent = rank.get(name))
+        });
     }
     /**
      * 新增：14 个地州名称标注（兵团市不标，避免小区域文字互相遮挡）。
@@ -27641,6 +27704,10 @@ const Qp = (r, t) => {
             },
             async play() {
                 this.canvasMap.time.resume(), this.canvasMap.animateTl.timeScale(1), this.canvasMap.animateTl.play()
+            },
+            // 新增：年份切换 —— 仅刷新地图数据（柱高/标签），不重建场景
+            updatePopulationData(r) {
+                this.canvasMap && this.canvasMap.updatePopulationData && this.canvasMap.updatePopulationData(r)
             }
         }
     },
